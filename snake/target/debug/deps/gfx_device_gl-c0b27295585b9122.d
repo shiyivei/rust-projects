@@ -1,0 +1,11 @@
+/Users/qinjianquan/rust-projects/snake/target/debug/deps/gfx_device_gl-c0b27295585b9122.rmeta: /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/lib.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/command.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/factory.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/info.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/shade.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/state.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/tex.rs
+
+/Users/qinjianquan/rust-projects/snake/target/debug/deps/gfx_device_gl-c0b27295585b9122.d: /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/lib.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/command.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/factory.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/info.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/shade.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/state.rs /Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/tex.rs
+
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/lib.rs:
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/command.rs:
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/factory.rs:
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/info.rs:
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/shade.rs:
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/state.rs:
+/Users/qinjianquan/.cargo/registry/src/github.com-1ecc6299db9ec823/gfx_device_gl-0.16.2/src/tex.rs:

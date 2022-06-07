@@ -1,0 +1,1 @@
+/Users/qinjianquan/rust-projects/snake/target/debug/snake: /Users/qinjianquan/rust-projects/snake/src/draw.rs /Users/qinjianquan/rust-projects/snake/src/game.rs /Users/qinjianquan/rust-projects/snake/src/main.rs /Users/qinjianquan/rust-projects/snake/src/snake.rs
