@@ -19,7 +19,7 @@ fn main() {
     //设置发送者和接收者
     let (tx, rx) = mpsc::channel::<String>();
 
-    //仍然是新建thread 处理每一个请求
+    //仍然是新建thread 处理每一个请求,注意，要循环啊
     thread::spawn(move || loop {
         //vec存储
         let mut buff = vec![0; MSG_SIZE];
@@ -52,6 +52,7 @@ fn main() {
     });
 
     println!("write a message");
+    //第二个loop
     loop {
         let mut buff = String::new();
         io::stdin()
