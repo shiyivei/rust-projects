@@ -1,13 +1,41 @@
-fn main() {
-    println!("1 - 2 = {}", 1i32 - 2); //类型决定了它的操作范围
-    println!("not true {}", !true); //类型决定了它的操作范围
-    println!("1 * 2^5 = {}", 1u32 << 5); //位运算
+use std::fmt::Debug;
+use std::fmt::Display;
 
-    let tuple = reverse((12, true));
-    println!("{:?}", tuple);
+struct Empty;
+struct Null;
+
+trait DoubleDrop<T> {
+    fn double_drop(self, _: T); //定义类型里面的方法
 }
 
-fn reverse(pair: (i32, bool)) -> (bool, i32) {
-    let (integer, boolean) = pair;
-    (boolean, integer) //最后一个语句不要加 ;
+impl<T, U> DoubleDrop<T> for U {
+    //为trait实现trait
+    fn double_drop(self, _: T) {}
+}
+
+fn main() {
+    let empty = Empty;
+    let null = Null;
+    empty.double_drop(null); //这个操作会释放其本身和传入的参数类型
+
+    let retangle = Retangle {
+        length: 32,
+        width: 46,
+    };
+    print_type(retangle)
+}
+
+fn print<T: Display>(t: T) {
+    println!("{}", t)
+}
+
+fn print_type<T: Debug>(t: T) {
+    //函数的泛型参数必须实现Debug
+    println!("{:?}", t);
+}
+
+#[derive(Debug)] //通过宏为类型实现Debug trait
+struct Retangle {
+    length: u32,
+    width: u32,
 }
