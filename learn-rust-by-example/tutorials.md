@@ -3,7 +3,7 @@
 ## 1.1 可执行文件
 
 ```
-rustc mian.rs //编译
+rustc main.rs //编译
 ./main 运行二进制文件
 ```
 
@@ -125,7 +125,7 @@ char（字符）：单个 Unicode 字符，如 'a'，'α' 和 '∞'（每个都�
 单元类型（unit type）：()。其唯一可能的值就是 () 这个空元组
 ```
 
-符合类型
+复合类型
 
 ```
 数组（array）：如 [1, 2, 3]
@@ -733,7 +733,7 @@ fn main() {
 }
 ```
 
-】**指针和引用**
+**指针和引用**
 
 对于指针来说，解构和解引用要分开
 
@@ -1117,6 +1117,8 @@ fn main() {
 
 ### 9.2.6 两个函数find和any
 
+。。。
+
 ## 9.3 高阶函数
 
 ```
@@ -1206,7 +1208,7 @@ self表示当前模块，super表示模块外
 
 # 11 crate
 
-crate是rust编译的独立单元，可以被编译为二进制执行文件或者库文件。可以通过rustc的选项 -- crate-type重载
+crate是rust编译的独立单元，可以被编译为二进制执行文件或者库文件。可以通过rustc的选项 -- crate-type重载？？？
 
 ## 11.1 库
 
@@ -1358,7 +1360,7 @@ fn main() {
 
 ## 14.4 约束
 
-虽然是泛型，但约束要求必须要实现的trait
+虽然是泛型，但约束是要求必须要实现的trait
 
 //函数中的约束
 
@@ -1449,3 +1451,592 @@ impl<T> PrintInOption for T where
 
 # 15 作用域规则
 
+## 15.1 RALL 
+
+资源获取即初始化，即任何对象在离开作用域的时候，就会调用析构函数释放资源
+
+```
+fn main() {
+    let int_val = Box::new(4); //在堆上分配内存
+    println!("{}", int_val);
+
+    //定义一个作用域
+    {
+        let int_val1 = Box::new(5i32);
+    } //内存释放
+
+    for i in 0..=10 {
+        //在数字区间遍历
+        println!("{:?}", create());
+    } //内存释放
+      //int_val 内存释放
+}
+
+fn create() -> u32 {
+    let int_val = Box::new(32u32);
+    println!("int_val {}", int_val);
+    *int_val
+}
+```
+
+使用valgrind对内存泄漏进行检查
+
+Rust中析构函数是通过Drop trait提供的，并且是自动调用的
+
+```
+struct Top;
+
+impl Drop for Top {
+    fn drop(&mut self) {
+        println!("Top is being dropped")
+    }
+}
+fn main() {
+    let x = Top;//我们为这个类型实现了Drop trait
+    println!("Made a TopDrop")//
+    //在此会调用Drop trait
+}
+```
+
+```
+Made a TopDrop
+Top is being dropped
+```
+
+## 15.2 所有权和移动
+
+### 15.2.1 可变性
+
+还就是堆栈数据的所有权问题，可以通过Box::new（valuetype）把数据强行分配在堆上
+
+```
+let x = Box::new("x");
+let y = x;
+println!("{}", y);
+// println!("{}",x) x引用的数据所有权已经转移
+```
+
+可以通过移动所有权来改变变量的可变性
+
+```
+fn main() {
+    let immutable_value = Box::new(35i32);
+    println!("{}", immutable_value);
+
+    let mut can_change_value = immutable_value;
+
+    *can_change_value = 25i32;
+    println!("{}", can_change_value)
+}
+```
+
+### 15.2.2 部分移动
+
+```
+fn main() {
+    #[derive(Debug)]
+    struct Person {
+        name: String,
+        age: u32,
+    }
+
+    let person = Person {
+        name: String::from("John"),
+        age: 27,
+    };
+
+    let Person { name, ref age } = person; //这里的name是解构出来的变量,而不是上面的结构体字段名称
+
+    println!("{:?}", name);
+    println!("{:?}", age);
+
+    // println!("{:?}",person) //不能再整体使用，因为部分字段age 被移动
+}
+```
+
+## 15.3 借用
+
+借用是不会获取所有权的，但移动会（值传递）借用：&T，就是引用，引用是值不会被销毁，借用检查器会检查这一点
+
+```
+fn main() {
+    let value1 = Box::new(45i32);
+    let value2 = 35i32;
+
+    eat_value(value1); //值传递
+    reserve_value(&value2); //借用
+}
+
+fn eat_value(value: Box<i32>) {
+    println!("the {} was destroyed", value)
+}
+fn reserve_value(value: &i32) {
+    println!("the {} is still alive", value)
+}
+```
+
+### 15.3.1 可变性
+
+借用的可变性和之前的意思是一样的，无非就是引用和移动，Box新建返回的是栈上的指针，堆上的数据
+
+```
+struct Book {
+    title: &'static str,
+    auther: &'static str,
+    year: u32,
+}
+
+fn borrow_book(book: &Book) {
+    println!(
+        "value was borrow {},{},{}",
+        book.title, book.auther, book.year
+    )
+}
+
+fn new_edition(book: &mut Book) {
+    book.year = 2022;
+    println!("year was changed {}", book.year)
+}
+
+fn main() {
+    let book = Book {
+        //一个实例
+        title: "cat",
+        auther: "shiyivei",
+        year: 2001,
+    };
+    borrow_book(&book); //借用不可变变量
+    let mut mut_book = book; //一个可变实例，移动
+    borrow_book(&mut mut_book); //借用可变变量
+    new_edition(&mut mut_book);
+}
+```
+
+### 15.3.2 别名使用
+
+不变借用就像读一样，可以多次。在可变借用之后，还可以继续借用
+
+### 15.3.3 ref 模式
+
+使用let 进行模式匹配和解时，ref‘可用来创建结构体/元组的字段的引用，前面已经展示过了。它是在左边对新变量的引用
+
+## 15.4 生命周期
+
+### 15.4.1 显示标注
+
+借用检查器来检查变量的生命周期，保证所有引用都是有效，借用需要在变量丢弃之前使用完毕
+
+和闭包类似，使用生命周期需要使用泛型，先声明，一般都是从函数外到函数内
+
+### 15.4.2 函数
+
+带生命周期函数签名的限制
+
+1. 任何引用都需标注好生命周期
+2. 任何被返回的引用都必须具有和某个输入量相同的生命周期或者静态类型
+
+```
+fn add_one<'a>(x: &'a mut i32) {
+    *x += 1;
+    println!("{}", x)
+}
+
+fn sum<'a, 'b>(x: &'a mut i32, y: &'a mut i32) {
+    println!("{}", *x + *y) //引用要解引用了才能计算
+}
+
+fn pass<'a, 'b>(x: &'a mut i32, _: &'b i32) -> &'a i32 {
+    x
+}
+fn main() {
+    let (mut a, mut b) = (1i32, 2i32);
+
+    add_one(&mut a);
+
+    sum(&mut a, &mut b);
+    let x = pass(&mut a, &mut b);
+}
+```
+
+核心的两句话，使用者不能比被使用者活的长；使用前要先定在参数之前定义，不管是返回值还是参数
+
+### 15.4.3 方法
+
+方法里面是和函数一样的写法
+
+```
+struct Owner(i32);
+
+impl Owner {
+    fn add_one<'a>(&'a mut self) {
+        self.0 += 1; //要写成+=，不要只写为+
+    }
+    fn print<'a>(&'a mut self) {
+        println!("{}", self.0);
+    }
+}
+fn main() {
+    let mut owner = Owner(1);
+    owner.add_one();
+
+    owner.print();
+    println!("{}", owner.0)
+}
+```
+
+### 15.4.4 结构体
+
+```
+#[derive(Debug)]
+struct Owner<'a> {
+    x: &'a i32,
+    y: &'a i32,
+}
+
+#[derive(Debug)]
+enum Either<'a> {
+    Num(i32),     //枚举里面是两个元组结构体
+    Ref(&'a i32), //枚举里面是两个元组结构体
+}
+
+fn main() {
+    let tuple = (5, 6); //给元组命名
+    let (x, y) = (3, 4); //直接解构
+
+    let double = Owner { x: &x, y: &y };
+    let en1 = Either::Num(y); //注意枚举实例化的方式
+    let en2 = Either::Ref(&x);
+
+    println!("{:?}", double);
+    println!("{:?}", en1);
+    println!("{:?}", en2);
+}
+```
+
+### 15.4.5 trait
+
+```
+#[derive(Debug)]
+struct Borrowed<'a> {
+    x: &'a i32,
+}
+
+impl<'a> Default for Borrowed<'a> { //在impl之后，Borrow之前
+    fn default() -> Self {
+        Self { x: &99 }
+    }
+}
+
+fn main() {
+    let borrow: Borrowed = Borrowed::default();
+    println!("{:?}", borrow)
+}
+```
+
+### 15.4.6 约束
+
+可以把生命周期看作是类泛型特性，在实际过程中某个类型参数需要实现特定trait，也需要满足生命周期要求 'a 和 T地位一样
+
+```
+use std::fmt::Debug; //引入的traits或者其他类型要尽量在rs文件开头
+
+#[derive(Debug)]
+struct Borrowed<'a, T: 'a> {
+    x: &'a T,
+}
+
+fn print<T>(t: T)
+where
+    T: Debug,
+{
+    println!("{:?}", t)
+}
+
+fn bound_print<'a, T>(t: &'a T)
+//注意生命周期在标注中的写法，和函数中的约束是一样的
+where
+    T: Debug + 'a,
+{
+    println!("{:?}", t)
+}
+
+fn main() {
+    let x = 32;
+    let t = Borrowed { x: &x };
+    print(t);
+    bound_print(&x);
+}
+```
+
+### 15.4.7 强制转换
+
+感觉上并没有强制转换，只是一种合理的写法罢了
+
+```
+fn multiply<'a>(first: &'a i32, second: &'a i32) -> i32 {
+    //两个参数生命周期都被强制转为‘a
+    first * second
+}
+
+fn choose_first<'a: 'b, 'b>(first: &'a i32, _: &'b i32) -> &'b i32 {
+    //手动声明以b‘为准
+    first
+}
+fn main() {
+    let a = 23i32;
+    {
+        let b = 32;
+        let res = multiply(&a, &b);
+        choose_first(&a, &b);
+        println!("res {}", res);
+        println!("choose {}", choose_first(&a, &b))
+    }
+}
+```
+
+### 15.4.8 static 
+
+static 是最长的，存在于整个程序运行期间， ‘static 可以被转为一个更短的生命周期。两种方式，他们都把数据保存在可执行文件的只读内存区
+
+```
+使用 static 声明来产生常量（constant）
+产生一个拥有 &'static str 类型的 string 字面量
+```
+
+```
+static NUM: i32 = 99;
+
+fn func<'a>(value: &'a i32) -> &'a i32 {
+    &NUM
+}
+
+fn main() {
+    {
+        let static_string = "I'm in read_only memory";
+        println!("{}", static_string)
+    }
+    {
+        let short_life_value = 19; //定义一个生命周期比较短的变量
+
+        func(&short_life_value);
+        println!("{:?}", func(&short_life_value));//使用它也是可以的
+    }
+    println!("{}", NUM)
+}
+```
+
+### 15.4.9 省略
+
+有些生命周期模式过于常用所以编译器会隐式添加它，以增强代码的可读性。如
+
+```
+fn example1(t: &i32) -> &i32 {
+    t
+}
+fn example2<'a>(t: &'a i32) -> &i32 {
+    t
+}
+```
+
+# 16 Trait
+
+Trait是类型的方法集
+
+```
+//先定义一个变量类型
+struct Sheep {
+    naked: bool,
+    name: &'static str,
+}
+//定义trait，方法集，为类型定义方法集合，主要是确定参数和返回值的类型和属性（trait 生命周期等）
+trait Animal {
+    fn new(name: &'static str) -> Self; //trait中的方法不用在方法名称前面声明生命周期标签，在实现的时候声明就可以了
+    fn name(&self) -> &'static str;
+    fn noise(&self) -> &'static str;
+    fn talk(&self) {
+        println!("{} sas {}", self.name(), self.noise())
+    }
+}
+//最后还可以声明一些其他的方法在trait方法集外
+impl Sheep {
+    fn is_naked(&self) -> bool {
+        self.naked
+    }
+    fn shear(&mut self) {
+        if self.naked {
+            println!("{} is already sheard", self.name())
+        } else {
+            println!("{} gets a shortcut", self.name());
+            self.naked = true
+        }
+    }
+}
+//为类型实现实现trait，这一步就是确定方法的方法体
+impl Animal for Sheep {
+    fn new(name: &'static str) -> Sheep {
+        Sheep {
+            name: name,
+            naked: false,
+        }
+    }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn noise(&self) -> &'static str {
+        if self.naked {
+            "naked"
+        } else {
+            "no naked"
+        }
+    }
+    fn talk(&self) {
+        println!("{} {}", self.name(), self.noise())
+    }
+}
+
+fn main() {
+    let mut dolly: Sheep = Animal::new("Dolly");
+    dolly.talk();
+    dolly.shear();
+    dolly.talk();
+}
+```
+
+## 16.1 Derive
+
+`#[derive]` [属性](https://rustwiki.org/zh-CN/rust-by-example/attribute.html)，编译器能够提供某些 trait 的基本实现,其实就是为类型在trait中实现方法，这也是rust语言最强的地方之一
+
+下面是可以自动派生的 trait：
+
+- 比较 trait: [`Eq`](https://rustwiki.org/zh-CN/std/cmp/trait.Eq.html), [`PartialEq`](https://rustwiki.org/zh-CN/std/cmp/trait.PartialEq.html), [`Ord`](https://rustwiki.org/zh-CN/std/cmp/trait.Ord.html), [`PartialOrd`](https://rustwiki.org/zh-CN/std/cmp/trait.PartialOrd.html)
+- [`Clone`](https://rustwiki.org/zh-CN/std/clone/trait.Clone.html), 用来从 `&T` 创建副本 `T`。
+- [`Copy`](https://rustwiki.org/zh-CN/core/marker/trait.Copy.html)，使类型具有 “复制语义”（copy semantics）而非 “移动语义”（move semantics）。
+- [`Hash`](https://rustwiki.org/zh-CN/std/hash/trait.Hash.html)，从 `&T` 计算哈希值（hash）。
+- [`Default`](https://rustwiki.org/zh-CN/std/default/trait.Default.html), 创建数据类型的一个空实例。
+- [`Debug`](https://rustwiki.org/zh-CN/std/fmt/trait.Debug.html)，使用 `{:?}` formatter 来格式化一个值
+
+```
+#[derive(PartialEq, PartialOrd, Debug)] //牛啊，以前一直不懂
+struct Comparable(i32);
+
+fn main() {
+    let c1 = Comparable(26);
+    let c2 = Comparable(30);
+
+    let res = if c1 == c2 {
+        println!("c1 = c2")
+    } else {
+        println!("c1 != c2")
+    };
+    println!("res is {:?}", res)
+}
+```
+
+## 16.2 使用dyn返回trait
+
+Rust需要知道返回类型需要多少空间，这意味着，所有的函数都必须返回一个具体类型。记下来就行，如果返回类型大小不确定
+
+```
+struct Sheep {}
+struct Cow {}
+
+trait Animal {
+    // 实例方法签名
+    fn noise(&self) -> &'static str;
+}
+
+// 实现 `Sheep` 的 `Animal` trait。
+impl Animal for Sheep {
+    fn noise(&self) -> &'static str {
+        "baaaaah!"
+    }
+}
+
+// 实现 `Cow` 的 `Animal` trait。
+impl Animal for Cow {
+    fn noise(&self) -> &'static str {
+        "moooooo!"
+    }
+}
+
+// 返回一些实现 Animal 的结构体，但是在编译时我们不知道哪个结构体。
+fn random_animal(random_number: f64) -> Box<dyn Animal> {
+    if random_number < 0.5 {
+        Box::new(Sheep {})
+    } else {
+        Box::new(Cow {})
+    }
+}
+
+fn main() {
+    let random_number = 0.234;
+    let animal = random_animal(random_number);
+    println!("You've randomly chosen an animal, and it says {}", animal.noise());
+}
+```
+
+## 16.3 运算符重载
+
+啥意思，就是让运算符有更多的行为，比如，+ 表示求和，也可以表示把字符串连接起来，我们甚至可以把+ 定义为-
+
+```
+use std::ops;
+struct Foo;
+struct Bar;
+
+#[derive(Debug)]
+struct FooBar;
+
+#[derive(Debug)]
+struct BarFoo;
+
+//分别实现了trait
+
+impl ops::Add<Bar> for Foo {
+    type Output = FooBar; //重命名
+
+    fn add(self, _a: Bar) -> FooBar {
+        println!("> Foo.add(Bar) was called");
+        FooBar
+    }
+}
+
+impl ops::Add<Foo> for Bar {
+    type Output = BarFoo; //重命名
+
+    fn add(self, _a: Foo) -> BarFoo {
+        println!("> Bar.add(Foo) was called");
+        BarFoo
+    }
+}
+
+fn main() {
+    println!("{:?}", Foo + Bar);
+    println!("{:?}", Bar + Foo);
+}
+```
+
+## 16.4 Drop
+
+只有drop一个方法，主要用于释放资源
+
+`Box`，`Vec`，`String`，`File`，以及 `Process` 是一些实现了 `Drop` trait 来释放 资源的类型。`Drop` trait 也可以为任何自定义数据类型手动实现
+
+```
+struct Droppable {
+    name: &'static str,
+}
+impl Drop for Droppable {
+    fn drop(&mut self) {
+        println!("> Dropping {}", self.name);
+    }
+}
+
+fn main() {
+    let name = "choose";
+    let drop = Droppable { name: &name };
+    //函数结束时自动实现，控制台会打印信息
+}
+```
+
+## 16.5 Iterator

@@ -1,41 +1,45 @@
-use std::fmt::Debug;
-use std::fmt::Display;
-
-struct Empty;
-struct Null;
-
-trait DoubleDrop<T> {
-    fn double_drop(self, _: T); //定义类型里面的方法
+struct CQueue {
+    data: Vec<i32>, //定义一个slice，
+    top: usize,     //栈中元素个数
 }
 
-impl<T, U> DoubleDrop<T> for U {
-    //为trait实现trait
-    fn double_drop(self, _: T) {}
+/**
+ * `&self` means the method takes an immutable reference.
+ * If you need a mutable reference, change it to `&mut self` instead.
+ */
+impl CQueue {
+    fn new() -> Self {
+        //初始化一个栈，实现一个队列
+        CQueue {
+            data: Vec::with_capacity(10000),
+            top: 0,
+        }
+    }
+
+    //入栈
+    fn append_tail(&mut self, value: i32) {
+        //判断栈的容量和存量关系
+        if self.top >= self.data.capacity() {
+            return println!("there is no space to append new value");
+        }
+        //入栈
+        self.data.push(value);
+        self.top += 1;
+    }
+
+    fn delete_head(&mut self) -> i32 {
+        if self.top == 0 {
+            return -1;
+        } else {
+            self.top -= 1;
+            self.data.pop();
+            if self.top == 0 {
+                return 0;
+            } else {
+                return self.data[0];
+            }
+        }
+    }
 }
 
-fn main() {
-    let empty = Empty;
-    let null = Null;
-    empty.double_drop(null); //这个操作会释放其本身和传入的参数类型
-
-    let retangle = Retangle {
-        length: 32,
-        width: 46,
-    };
-    print_type(retangle)
-}
-
-fn print<T: Display>(t: T) {
-    println!("{}", t)
-}
-
-fn print_type<T: Debug>(t: T) {
-    //函数的泛型参数必须实现Debug
-    println!("{:?}", t);
-}
-
-#[derive(Debug)] //通过宏为类型实现Debug trait
-struct Retangle {
-    length: u32,
-    width: u32,
-}
+fn main() {}
