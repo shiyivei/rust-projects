@@ -2907,5 +2907,884 @@ fn main() {
 
 ### 18.4.2 定义一种错误类型
 
+把不同的错误类型视为一种错误类型会简化代码
 
+```
+use std::error;
+use std::fmt;
+
+type Result<T> = std::result::Result<T, DoubleError>;
+
+#[derive(Debug, Clone)]
+struct DoubleError;
+
+impl fmt::Display for DoubleError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid first item to double")
+    }
+}
+
+impl error::Error for DoubleError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
+    }
+}
+
+fn double_first(vec: Vec<&str>) -> Result<i32> {
+    vec.first()
+        .ok_or(DoubleError)
+        .and_then(|s| s.parse::<i32>().map_err(|_| DoubleError).map(|i| 2 * i))
+}
+
+fn print(result: Result<i32>) {
+    match result {
+        Ok(n) => println!("the first doubed is {}", n),
+        Err(e) => println!("Error {}", e),
+    }
+}
+
+fn main() {
+    let numbers = vec!["42", "93", "18"];
+    let empty = vec![];
+    let strings = vec!["tofu", "93", "18"];
+
+    print(double_first(numbers));
+    print(double_first(empty));
+    print(double_first(strings))
+}
+```
+
+### 18.4.3 把错误装箱
+
+想简单但又想保留原始错误信息，可以把错误装箱，坏处，该错误类型只能在运行时了解，而不能被静态的判别
+
+只要实现了Error trait类型，Box就可以通过From将其转换为Box<Error>,注意写法
+
+```
+use std::error;
+use std::fmt;
+
+type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
+
+#[derive(Debug, Clone)]
+struct EmptyVec;
+
+impl fmt::Display for EmptyVec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid first to double")
+    }
+}
+
+impl error::Error for EmptyVec {
+    fn description(&self) -> &str {
+        "Invalid first item to double"
+    }
+
+    fn cause(&self) -> Option<&dyn error::Error> {
+        None
+    }
+}
+
+fn double_first(vec: Vec<&str>) -> Result<i32> {
+    vec.first()
+        .ok_or_else(|| EmptyVec.into())
+        .and_then(|s| s.parse::<i32>().map_err(|e| e.into()).map(|i| 2 * i))
+}
+
+fn print(result: Result<i32>) {
+    match result {
+        Ok(n) => println!("the first double is {}", n),
+        Err(e) => println!("Error:{}", e),
+    }
+}
+
+fn main() {
+    let numbers = vec!["42", "93", "18"];
+
+    let empty = vec![];
+
+    let strings = vec!["tofu", "93", "18"];
+    print(double_first(numbers));
+    print(double_first(empty));
+    print(double_first(strings));
+}
+```
+
+### 18.4.4 ？的其他用法
+
+小技巧太多，要熟练甄别
+
+```
+use std::error;
+use std::fmt;
+
+type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
+
+#[derive(Debug, Clone)]
+struct EmptyVec;
+
+impl fmt::Display for EmptyVec {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid first to double")
+    }
+}
+
+impl error::Error for EmptyVec {}
+
+fn double_first(vec: Vec<&str>) -> Result<i32> {
+    let first = vec.first().ok_or(EmptyVec)?;
+    let parsed = first.parse::<i32>()?;
+    Ok(2 * parsed)
+}
+
+fn print(result: Result<i32>) {
+    match result {
+        Ok(n) => println!("the first double is {}", n),
+        Err(e) => println!("Error:{}", e),
+    }
+}
+
+fn main() {
+    let numbers = vec!["42", "93", "18"];
+
+    let empty = vec![];
+
+    let strings = vec!["tofu", "93", "18"];
+    print(double_first(numbers));
+    print(double_first(empty));
+    print(double_first(strings));
+}
+```
+
+### 18.4.5 包裹错误
+
+把错误包装也可以把错误包装到自己的错误类型中
+
+```
+use std::error;
+use std::fmt;
+use std::num::ParseIntError;
+
+type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
+
+#[derive(Debug, Clone)]
+enum DoubleError {
+    EmptyVec,
+    Parse(ParseIntError),
+}
+
+impl fmt::Display for DoubleError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            DoubleError::EmptyVec => write!(f, "please use a vector with at least one element"),
+            DoubleError::Parse(ref e) => e.fmt(f),
+        }
+    }
+}
+
+impl error::Error for DoubleError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match *self {
+            DoubleError::EmptyVec => None,
+
+            DoubleError::Parse(ref e) => Some(e),
+        }
+    }
+}
+
+impl From<ParseIntError> for DoubleError {
+    fn from(err: ParseIntError) -> DoubleError {
+        DoubleError::Parse(err)
+    }
+}
+
+fn double_first(vec: Vec<&str>) -> Result<i32> {
+    let first = vec.first().ok_or(DoubleError::EmptyVec)?;
+    let parsed = first.parse::<i32>()?;
+    Ok(2 * parsed)
+}
+
+fn print(result: Result<i32>) {
+    match result {
+        Ok(n) => println!("the first double is {}", n),
+        Err(e) => println!("Error:{}", e),
+    }
+}
+
+fn main() {
+    let numbers = vec!["42", "93", "18"];
+
+    let empty = vec![];
+
+    let strings = vec!["tofu", "93", "18"];
+    print(double_first(numbers));
+    print(double_first(empty));
+    print(double_first(strings));
+}
+```
+
+## 18.5 遍历Result
+
+只能迭代获取后面两个元素
+
+```
+fn main() {
+    let strings = vec!["tofu", "93", "18"];
+    let nums: Vec<_> = strings.into_iter().map(|s| s.parse::<i32>().ok()).collect();
+    println!("Results: {:?}", nums)
+}
+```
+
+使用filter忽略失败的项
+
+```
+fn main() {
+    let strings = vec!["tofu", "93", "18"];
+    let nums: Vec<_> = strings
+        .into_iter()
+        .filter_map(|s| s.parse::<i32>().ok())
+        .collect();
+    println!("Results: {:?}", nums)
+}
+```
+
+使用collect使整个操作失败
+
+```
+fn main() {
+    let strings = vec!["tofu", "93", "18"];
+    let nums: Result<Vec<_>, _> = strings.into_iter().map(|s| s.parse::<i32>()).collect();
+    println!("Results: {:?}", nums)
+}
+```
+
+同样的技巧也可以对Option使用
+
+使用Partition() 收集所有合法的值和错误
+
+```
+fn main() {
+    let strings = vec!["tofu", "43", "89"];
+    let (nums, err): (Vec<_>, Vec<_>) = strings
+        .into_iter()
+        .map(|s| s.parse::<i32>())
+        .partition(Result::is_ok);
+    println!("{:?}", nums);
+    println!("{:?}", err);
+}
+```
+
+上述的值还保存在Result中，可以通过一些模式将其取出
+
+```
+fn main() {
+    let strings = vec!["tofu", "43", "89"];
+    let (nums, err): (Vec<_>, Vec<_>) = strings
+        .into_iter()
+        .map(|s| s.parse::<i32>())
+        .partition(Result::is_ok);
+
+    let numbers: Vec<_> = nums.into_iter().map(Result::unwrap).collect();
+    let errors: Vec<_> = err.into_iter().map(Result::unwrap_err).collect();
+    println!("{:?}", numbers);
+    println!("{:?}", errors);
+}
+```
+
+# 19 标准库类型
+
+标准库提供了很多自定义的类型，在原生类型基础上进行了大量的扩充
+
+- 可增长的 `String`（字符串），如: `"hello world"`
+- 可增长的向量（vector）: `[1, 2, 3]`
+- 选项类型（optional types）: `Option<i32>`
+- 错误处理类型（error handling types）: `Result<i32, i32>`
+- 堆分配的指针（heap allocated pointers）: `Box<i32>`
+
+## 19.1 箱子、栈和堆
+
+箱子Box<T>是一个指针，数据存放在堆山，可以使用*解引用
+
+```
+use std::mem;
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+struct Point {
+    x: f64,
+    y: f64,
+}
+
+#[allow(dead_code)]
+struct Rectangle {
+    p1: Point,
+    p2: Point,
+}
+
+fn origin() -> Point {
+    Point { x: 0.0, y: 0.0 }
+}
+
+fn boxed_origin() -> Box<Point> {
+    Box::new(Point { x: 0.0, y: 0.0 })
+}
+
+fn main() {
+    let point: Point = origin();
+    let rectangle: Rectangle = Rectangle {
+        p1: origin(),
+        p2: Point { x: 3.0, y: 4.0 },
+    };
+
+    let boxed_rectangle: Box<Rectangle> = Box::new(Rectangle {
+        p1: origin(),
+        p2: origin(),
+    });
+
+    let boxed_point: Box<Point> = Box::new(origin());
+
+    println!(
+        "Point occupies {} bytes in the stack",
+        mem::size_of_val(&point)
+    );
+    println!(
+        "Rectangle occupies {} bytes in the stack",
+        mem::size_of_val(&rectangle)
+    );
+    println!(
+        "box rectangle occupies {} bytes in the stack",
+        mem::size_of_val(&boxed_rectangle)
+    );
+
+    let unboxed_point: Point = *boxed_point;
+    println!(
+        "Unboxed point occupies {} bytes in the stack",
+        mem::size_of_val(&unboxed_point)
+    )
+}
+```
+
+## 19.2 动态数组
+
+动态数组三要素，指向数据的指针、长度和容量。超过容量会重新分配更大的内存，基本操作没有什么特别的
+
+```
+fn main() {
+    let collected_iterator: Vec<i32> = (0..10).collect();
+    println!("{:?}", collected_iterator);
+
+    let mut xs = vec![1i32, 2, 3];
+    println!("vec is {:?}", xs);
+
+    xs.push(4i32);
+    println!("vec is {:?}", xs);
+
+    println!("the popped element is {:?}", xs.pop());
+
+    for x in xs.iter() {
+        println!("> {}", x);
+    }
+
+    for (i, x) in xs.iter().enumerate() {
+        println!("in position {} we have value {}", i, x);
+    }
+
+    for x in xs.iter_mut() {
+        *x *= 3;
+    }
+    println!("xs is  {:?}", xs)
+}
+```
+
+## 19.3 字符串
+
+两种字符串类型
+
+String 和 &str ，Str是一个Vec(Vec<u8>),而 &str指向的是一个切片
+
+```
+fn main() {
+    let pangram: &'static str = "the quick brown fox jumps over the lazy dog";
+    println!("{}", pangram);
+
+    for word in pangram.split_whitespace().rev() {
+        println!("{}", word)
+    }
+
+    let mut chars: Vec<char> = pangram.chars().collect();
+    chars.sort(); //排序
+    chars.dedup(); //去重
+
+    println!("{:?}", chars);
+
+    let mut string = String::new();
+    for c in chars {
+        string.push(c);
+        string.push_str(",")
+    }
+
+    let chars_to_trim: &[char] = &[' ', ','];
+    let trimed_str: &str = string.trim_matches(chars_to_trim);
+    println!("{}", trimed_str);
+
+    let alice = String::from("I like dogs");
+    let bob: String = alice.replace("dog", "cat");
+
+    println!("bob says I like dogs {}", bob);
+    println!("alice says I like dogs {}", alice);
+
+    println!("")
+}
+```
+
+字面量与转义字符
+
+这个以后再说吧了解吧，感觉目前实用不是很大
+
+## 19.4 选项Option
+
+Option前面我们详细讲过了
+
+## 19.5 Result
+
+Result能够返回为什么会失败的问题，前面的我们也详细讲过了
+
+## 19.6 Panic！
+
+产生恐慌并会退栈，运行时通过调用析构函数释放所有资源
+
+## 19.7 Hash表
+
+哈希表的键可以是任意实现了Eq或者Hash trait的类型
+
+两种创建方式
+
+```
+HashMap::with_capacity(uint) 创建具有初始容量的HashMap，也可以使用HashMap::new()来获得带有默认容量的HashMap
+```
+
+```
+use std::collections::HashMap;
+
+fn call(number: &str) -> &str {
+    match number {
+        "798" => "sorry",
+        "675" => "hello",
+        _ => " Hi ",
+    }
+}
+
+fn main() {
+    let mut contacts = HashMap::new();
+
+    contacts.insert("da", "798");
+    contacts.insert("fa", "675");
+
+    match contacts.get(&"da") {
+        Some(&number) => println!(" calling da: {}", call(number)),
+        _ => println!("wrong number"),
+    }
+
+    contacts.remove(&"da");
+
+    for (contact, &number) in contacts.iter() {
+        println!(" calling fa: {}:{}", contact, call(number));
+    }
+}
+```
+
+### 19.7.1 更改类型或者自定义关键字类型
+
+f32和f64没有实现Hash，给自定义类型实现Eq和Hash，使用宏即可
+
+```
+#[derive(PartialEq,Eq,Hash)]
+```
+
+```
+use std::collections::HashMap;
+
+#[derive(PartialEq, Eq, Hash)]
+struct Account<'a> {
+    username: &'a str,
+    password: &'a str,
+}
+
+struct AccountInfo<'a> {
+    name: &'a str,
+    email: &'a str,
+}
+
+type Accounts<'a> = HashMap<Account<'a>, AccountInfo<'a>>;
+
+fn try_logon<'a>(accounts: &Accounts<'a>, username: &'a str, password: &'a str) {
+    println!("Username: {}", username);
+    println!("Password: {}", password);
+    println!("attempting logon...");
+
+    let logon = Account {
+        username: username,
+        password: password,
+    };
+
+    match accounts.get(&logon) {
+        Some(account_info) => {
+            println!("Successful logon");
+            println!("Name:{}", account_info.name);
+            println!("Email: {}", account_info.email);
+        }
+        _ => println!("Login failed"),
+    }
+}
+fn main() {
+    let mut accounts: Accounts = HashMap::new();
+
+    let account = Account {
+        username: "shiyivei",
+        password: "123456",
+    };
+
+    let account_info = AccountInfo {
+        name: "jianquan",
+        email: "jianquan@gmail.com",
+    };
+
+    accounts.insert(account, account_info);
+
+    try_logon(&accounts, "shiyivei", "123456");
+    try_logon(&accounts, "shiyivei", "123456");
+}
+```
+
+### 19.7.2 散列集HashSet
+
+关于集合的操作，差集，并集，交集，对称差，牛的，Rust居然在标准库里实现了这些
+
+```
+use std::collections::HashSet;
+
+fn main() {
+    let mut a: HashSet<i32> = vec![1i32, 2, 3].into_iter().collect();
+    let mut b: HashSet<i32> = vec![2i32, 3, 4].into_iter().collect();
+
+    assert!(a.insert(4));
+    assert!(a.contains(&4));
+
+    // assert!(b.insert(4), "the value 4 already in b");
+
+    b.insert(5);
+
+    println!("A: {:?}", a);
+    println!("B: {:?}", b);
+
+    
+    println!("Union: {:?}", a.union(&b).collect::<Vec<&i32>>());
+    println!("Difference: {:?}", a.difference(&b).collect::<Vec<&i32>>());
+    println!(
+        "intersection: {:?}",
+        a.intersection(&b).collect::<Vec<&i32>>()
+    );
+    println!(
+        "Symmetric Difference: {:?}",
+        a.symmetric_difference(&b).collect::<Vec<&i32>>()
+    );
+}
+```
+
+## 19.8 引用计数Rc
+
+这个也是神奇，为了所有权这件事真是绞尽脑汁
+
+```
+use std::rc::Rc;
+
+fn main() {
+    let rc_examples = "Rc example".to_string();
+
+    {
+        println!("-----------start----------------");
+
+        let rc_a: Rc<String> = Rc::new(rc_examples);
+
+        println!("Reference Count of rc_a : {}", Rc::strong_count(&rc_a));
+
+        {
+            println!("---------------clone---------------");
+
+            let rc_b: Rc<String> = Rc::clone(&rc_a);
+
+            println!("Reference Count of rc_b : {}", Rc::strong_count(&rc_b));
+            println!("Reference Count of rc_a : {}", Rc::strong_count(&rc_a));
+
+            println!("equal {}", rc_a.eq(&rc_b));
+
+            println!("length {}", rc_a.len());
+            println!("value rc_b {}", rc_b);
+
+            println!("-----------end--------------")
+        }
+
+        println!("Reference Count of rc_a : {}", Rc::strong_count(&rc_a));
+
+        println!("-----------outofscope-----------")
+    }
+}
+```
+
+## 19.9 共享的引用计数Arc
+
+线程之间所有权需要共享时，可以使用Arc（这个结构通过Clone实现）
+
+```
+use std::sync::Arc;
+use std::thread;
+
+fn main() {
+    let apple = Arc::new("the same apple");
+
+    for _ in 0..10 {
+        let apple = Arc::clone(&apple);
+        thread::spawn(move || {
+            println!("{:?}", apple);
+        });
+    }
+}
+```
+
+# 20 标准库的更多介绍
+
+## 20.1 线程
+
+rust通过使用spawn函数提供了创建本地操作系统的（native OS）线程的机制，该函数的餐食是一个通过值捕获变变量的闭包。线程由操作系统调度
+
+```
+use std::thread;
+static NTHEADS: i32 = 10;
+fn main() {
+    let mut children = vec![];
+
+    for i in 0..NTHEADS {
+        //
+        children.push(thread::spawn(move || {
+            println!("this is thread number {}", i)
+        }));
+    }
+
+    for child in children {
+        let _ = child.join();
+    }
+}
+```
+
+### 20.1.1 测试实例
+
+```
+use std::thread;
+
+fn main() {
+    //定义了一个变量
+    let data = "2452015845283756927556438457";
+    //定义了一个空数组
+    let mut children = vec![];
+
+    //把数据分段
+    let chunked_data = data.split_whitespace();
+
+    for (i, data_segment) in chunked_data.enumerate() {
+        println!("data segment {} is \"{}\"", i, data_segment);
+
+        children.push(thread::spawn(move || -> u32 {
+            let result = data_segment
+                .chars()
+                .map(|c| c.to_digit(10).expect("should be a digit"))
+                .sum();
+
+            println!("process segment {},result: {}", i, result);
+            result
+        }));
+    }
+
+    let mut intermediate_sums = vec![];
+    for child in children {
+        let intermediate_sum = child.join().unwrap();
+        intermediate_sums.push(intermediate_sum);
+    }
+
+    let final_result = intermediate_sums.iter().sum::<u32>();
+
+    println!("inal result: {}", final_result)
+}
+```
+
+## 20.2 通道
+
+rust为线程之间的通信提供了异步通道，通道允许两个端点之间的信息单向流动，sender和receiver
+
+```
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
+use std::thread;
+
+static NTHEADS: i32 = 3;
+fn main() {
+    let (tx, rx): (Sender<i32>, Receiver<i32>) = mpsc::channel();
+
+    for id in 0..NTHEADS {
+        let thread_tx = tx.clone();
+
+        thread::spawn(move || {
+            thread_tx.send(id).unwrap();
+
+            println!("thread {} finished", id);
+        });
+    }
+
+    let mut ids = Vec::with_capacity(NTHEADS as usize);
+    for _ in 0..NTHEADS {
+        ids.push(rx.recv());
+    }
+
+    println!("{:?}", ids)
+}
+```
+
+## 20.3 路径
+
+Path结构体代表了底层文件系统的文件路径。 Path分为两种：UNIX和Windows::Path,prelude 会选择并输出符合平台类型的Path种类
+
+Path可以从OsStr类型创建，并且它提供了数种方法，用户获取路径指向的文件/目录的信息
+
+Path在内部是存储为若干字节的（Vec<u8>）的vector。因此将Path转换为&str并非零开销（free），且可能失败（返回的是一个Option）
+
+```
+use std::path::Path;
+fn main() {
+    let path = Path::new(".");
+
+    let display = path.display();
+
+    let new_path = path.join("a").join("b").join("c");
+    match new_path.to_str() {
+        None => panic!("new path is not valid UTF-8 sequence"),
+        Some(s) => println!("new path is {}", s),
+    }
+}
+```
+
+## 20.4 文件输出
+
+File 的所有方法都返回的是io::Result<T> 类型，它是Result<T,io::Error> 的别名
+
+### 20.4.1 打开文件
+
+open以只读模式打开文件
+
+```
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
+fn main() {
+    let path = Path::new("hello.txt");
+
+    let display = path.display();
+
+    let mut file = match File::open(&path) {
+        Err(why) => panic!("could open {}: {:?}", display, why),
+        Ok(file) => file,
+    };
+
+    let mut s = String::new();
+    match file.read_to_string(&mut s) {
+        Err(why) => panic!("could not read {} : {:?}", display, why),
+        Ok(_) => print!("{} contains \n{}", display, s),
+    }
+}
+```
+
+### 20.4.2 创建文件create
+
+create静态方法以只写模式打开一个文件，文件存在会销毁旧内容，否则新建文件
+
+```
+static LOREM_IPSUM: &'static str =
+    "Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
+cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non
+proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+";
+
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
+fn main() {
+    let path = Path::new("out/lorem_ipsum.txt");
+    let display = path.display();
+
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {:?}", display, why),
+        Ok(file) => file,
+    };
+
+    match file.write_all(LOREM_IPSUM.as_bytes()) {
+        Err(why) => {
+            panic!("couldn't write to {}: {:?}", display, why)
+        }
+        Ok(_) => println!("successfully wrote to {}", display),
+    }
+}
+```
+
+## 20.4.3 读取行
+
+方法lines（）在文件行上返回一个迭代器
+
+```
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::path::Path;
+
+fn main() {
+    if let Ok(lines) = read_lines("./hosts") {
+        for line in lines {
+            if let Ok(ip) = line {
+                println!("{}", ip);
+            }
+        }
+    }
+}
+fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+where
+    P: AsRef<Path>,
+{
+    let file = File::open(filename)?;
+    Ok(io::BufReader::new(file).lines())
+}
+```
+
+这个过程比再内存中创建String更有效，特别是处理更大的文件
+
+## 20.5 子进程
+
+```
+use std::process::Command;
+
+fn main() {
+    let output = Command::new("rustc")
+        .arg("--version")
+        .output()
+        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+
+    if output.status.success() {
+        let s = String::from_utf8_lossy(&output.stdout);
+        print!("rustc succeed and stdout was:\n{}", s);
+    } else {
+        let s = String::from_utf8_lossy(&output.stderr);
+        print!("rustc failed and stderr was: \n {}", s)
+    }
+}
+```
 

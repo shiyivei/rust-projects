@@ -1,17 +1,16 @@
-use std::num::ParseIntError;
-
-fn double_first(vec: Vec<&str>) -> Result<Option<i32>, ParseIntError> {
-    let opt = vec.first().map(|first| first.parse::<i32>().map(|n| 2 * n));
-
-    opt.map_or(Ok(None), |r| r.map(Some))
-}
+use std::process::Command;
 
 fn main() {
-    let nums = vec!["32", "46", "78"];
-    let empty = vec![];
-    let string = vec!["todo", "32", "78"];
+    let output = Command::new("rustc")
+        .arg("--version")
+        .output()
+        .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
 
-    println!("the first vec is {:?}", double_first(nums));
-    println!("the first vec is {:?}", double_first(empty));
-    println!("the first vec is {:?}", double_first(string))
+    if output.status.success() {
+        let s = String::from_utf8_lossy(&output.stdout);
+        print!("rustc succeed and stdout was:\n{}", s);
+    } else {
+        let s = String::from_utf8_lossy(&output.stderr);
+        print!("rustc failed and stderr was: \n {}", s)
+    }
 }
