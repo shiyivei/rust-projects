@@ -3788,3 +3788,354 @@ fn main() {
 }
 ```
 
+### 20.5.1 管道
+
+```
+use std::io::prelude::*;
+
+use std::process::{Command, Stdio};
+
+static PANGRAM: &'static str = "the quick brown fox jumped over the lazy dog\n";
+fn main() {
+    let proccess = match Command::new("wc")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+    {
+        Err(why) => panic!("couldn't spawn wc: {:?}", why),
+        Ok(process) => process,
+    };
+
+    match proccess.stdin.unwrap().write_all(PANGRAM.as_bytes()) {
+        Err(why) => panic!("couldn't write to wc stdin: {:?}", why),
+        Ok(_) => println!("sent pangram to wc"),
+    }
+
+    let mut s = String::new();
+
+    match proccess.stdout.unwrap().read_to_string(&mut s) {
+        Err(why) => panic!("couldn't read  wc from stdout: {:?}", why),
+        Ok(_) => print!("wc responded with: \n{:?}", s),
+    }
+}
+```
+
+### 20.5.2 等待
+
+如果想等待一个process;;Child完成，必须调用Child::wait,这会返回一个process::ExitStatus
+
+```
+use std::process::Command;
+
+fn main() {
+    let mut child = Command::new("sleep").arg("5").spawn().unwrap();
+    let _resukt = child.wait().unwrap();
+
+    println!("reached end of main");
+}
+```
+
+### 20.6 文件系统操作
+
+牛的，Rust居然有一系列的命令可以用于文件的操作
+
+```
+use std::fs;
+use std::fs::{File, OpenOptions};
+use std::io;
+use std::io::prelude::*;
+use std::os::unix;
+use std::path::Path;
+
+fn cat(path: &Path) -> io::Result<String> {
+    let mut f = File::open(path)?;
+    let mut s = String::new();
+    match f.read_to_string(&mut s) {
+        Ok(_) => Ok(s),
+        Err(e) => Err(e),
+    }
+}
+
+fn echo(s: &str, path: &Path) -> io::Result<()> {
+    let mut f = File::create(path)?;
+
+    f.write_all(s.as_bytes())
+}
+
+fn touch(path: &Path) -> io::Result<()> {
+    match OpenOptions::new().create(true).write(true).open(path) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+fn main() {
+    println!("`mkdir a`");
+
+    match fs::create_dir("a") {
+        Err(why) => println!("! {:?}", why.kind()),
+        Ok(_) => {}
+    }
+
+    println!("`echo hello > a/b.txt`");
+    echo("hello", &Path::new("a/b.txt")).unwrap_or_else(|why| println!("! {:?}", why.kind()));
+
+    println!("`mkdir -p a/c/d`");
+    fs::create_dir_all("a/c/d").unwrap_or_else(|why| println!("! {:?}", why.kind()));
+
+    println!("`touch a/c/e.txt");
+    touch(&Path::new("a/c/e.txt")).unwrap_or_else(|why| println!("! {:?}", why.kind()));
+
+    println!("`ln -s ../b.txt a/c/b.txt`");
+    if cfg!(target_family = "unix") {
+        unix::fs::symlink("../b.txt", "a/c/b.txt").unwrap_or_else(|why| {
+            println!("! {:?}", why.kind());
+        });
+    }
+
+    println!("`cat a/c/b.txt`");
+    match cat(&Path::new("a/c/b.txt")) {
+        Err(why) => println!("! {:?}", why.kind()),
+        Ok(s) => println!("> {}", s),
+    }
+    println!("`ls a`");
+
+    match fs::read_dir("a") {
+        Err(why) => println!("! {:?}", why.kind()),
+        Ok(paths) => {
+            for path in paths {
+                println!("> {:?}", path.unwrap().path())
+            }
+        }
+    }
+
+    println!("`rm a/c/e.txt`");
+    fs::remove_file("a/c/e.txt").unwrap_or_else(|why| {
+        println!("! {:?}", why.kind());
+    });
+
+    println!("`rmdir a/c/d`");
+
+    fs::remove_dir("a/c/d").unwrap_or_else(|why| {
+        println!("! {:?}", why.kind());
+    });
+}
+```
+
+另外就可以使用cat函数用？标记
+
+## 20.7.1 程序参数
+
+命令行参数使用
+
+```
+std::env::args进行接收，返回一个迭代器
+```
+
+```
+use std::env;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    println!("My path is {}", args[0]);
+
+    println!("I got {:?} arguments: {:?}", args.len() - 1, &args[1..]);
+}
+```
+
+## 20.7.1 参数解析
+
+可以用模式匹配来接些简单的参数，这在web服务中非常常用
+
+```
+use std::env;
+
+fn increase(number: i32) {
+    println!("{}", number + 1)
+}
+
+fn decrease(number: i32) {
+    println!("{}", number - 1)
+}
+
+fn help() {
+    println!(
+        "usage:
+    match_args <string> Check whether given string is the answer.
+    match_args {{increase|decrease}} <integer>
+    ncrease or decrease given integer by one"
+    )
+}
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    match args.len() {
+        1 => {
+            println!("My name is 'match_args', Try pass some arguments");
+        }
+
+        2 => match args[1].parse() {
+            Ok(42) => println!("This is the answer"),
+            _ => println!("This is not the answer"),
+        },
+
+        3 => {
+            let cmd = &args[1];
+            let num = &args[2];
+
+            let number: i32 = match num.parse() {
+                Ok(n) => n,
+                Err(_) => {
+                    println!("error: second argument is not an integer");
+                    help();
+                    return;
+                }
+            };
+
+            match &cmd[..] {
+                "increase" => increase(number),
+                "decrease" => decrease(number),
+                _ => {
+                    println!("error:invalid argument");
+                    help();
+                }
+            }
+        }
+
+        _ => {
+            help();
+        }
+    }
+}
+```
+
+## 20.8 外部语言函数接口
+
+Rust提供了到C语言库的外部函数接口。外部语言函数必须在一个external代码块中声明，且该代码块要带有一个包含库名称的#[link]属性
+
+```
+use std::fmt;
+
+#[link(name = "m")]
+
+extern "C" {
+    fn csqrtf(z: Complex) -> Complex;
+
+    fn ccosf(z: Complex) -> Complex;
+}
+
+fn cos(z: Complex) -> Complex {
+    unsafe { ccosf(z) }
+}
+
+fn main() {
+    let z = Complex { re: -1., im: 0. };
+
+    let z_sqrt = unsafe { csqrtf(z) };
+
+    println!("the square root of {:?} is {:?}", z, z_sqrt);
+
+    println!("cos({:?}) = {:?}", z, cos(z));
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Complex {
+    re: f32,
+    im: f32,
+}
+
+impl fmt::Debug for Complex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.im < 0. {
+            write!(f, "{}-{}i", self.re, -self.im)
+        } else {
+            write!(f, "{}+{}i", self.re, self.im)
+        }
+    }
+}
+```
+
+# 21 测试
+
+Rust测试有三种，大家都知道的
+
+# 22 不安全的操作
+
+```
+解引用裸指针
+通过 FFI 调用函数（这已经在之前的章节介绍过了）
+调用不安全的函数
+内联汇编（inline assembly）
+```
+
+**原始指针**
+
+解引用裸指针只能通过不安全的代码块执行
+
+```
+fn main() {
+    let raw_p: *const u32 = &10;
+
+    unsafe { assert!(*raw_p == 10) }
+}
+```
+
+**调用不安全的函数**
+
+这块知识还是比较模糊的，后面结合实际案例再继续研究了
+
+```
+use std::slice;
+
+fn main() {
+    let some_vector = vec![1, 2, 3, 4];
+
+    let pointer = some_vector.as_ptr();
+
+    let length = some_vector.len();
+
+    unsafe {
+        let my_slice: &[u32] = slice::from_raw_parts(pointer, length);
+
+        assert_eq!(some_vector.as_slice(), my_slice);
+    }
+}
+```
+
+# 23 兼容性
+
+## 23.1 原始标志符
+
+原始标志符允许我们使用通常不允许的关键字
+
+```
+extern crate foo;
+
+fn main() {
+
+    foo::r#try():
+}
+```
+
+# 24 补充
+
+基础设施
+
+```
+文档：通过附带的 rustdoc 生成库文档给用户
+测试：为库创建测试套件，确保库准确地实现了你想要的功能
+基准测试（benchmark）：对功能进行基准测试，保证其运行速度足够快
+```
+
+## 24.1 文档
+
+注释
+
+文档属性
+
+上述都比较简单，就不一一罗列了
+
+## 24.2 Playpen
+
+即Rust PlayGround，想要踏实学习Rust的话还会老老实实配置开发环境吧，也不是很难
