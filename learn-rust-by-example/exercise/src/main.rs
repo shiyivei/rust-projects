@@ -1,6 +1,12 @@
-extern crate foo;
+panic = 'abort'
+
+use std::panic;
+
 
 fn main() {
 
-    foo::r#try():
+    let result = panic::catch_unwind(|| {
+        panic!("oh no");
+    });
+    
 }

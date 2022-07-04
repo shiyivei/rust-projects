@@ -6,6 +6,7 @@ extern crate time;
 use serde_derive::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt::Write;
+use std::time::{SystemTime, UNIX_EPOCH};
 use time::*;
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,7 +46,7 @@ pub struct Chain {
 }
 
 impl Chain {
-    fn new(miner_addr: String, difficulty: u32) -> Chain {
+    pub fn new(miner_addr: String, difficulty: u32) -> Chain {
         //实例化一个chain
         let mut chain = Chain {
             chain: Vec::new(),
@@ -79,40 +80,57 @@ impl Chain {
         Chain::hash(&block.header)
     }
 
+    //更新区块难度
     pub fn update_difficulty(&mut self, difficulty: u32) -> bool {
         self.difficulty = difficulty;
         true
     }
 
+    //更新挖矿奖励
     pub fn update_reward(&mut self, reward: f32) -> bool {
         self.reward = reward;
         true
     }
 
+    //创建新的区块
     pub fn generate_new_block(&mut self) -> bool {
+        //获取当前系统时间
+        let time_now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(n) => n.as_secs(),
+            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+        };
+        //1.初始化区块头
         let header = BlockHeader {
-            timestamp: time::now().to_timespec().sec,
+            timestamp: time_now as i64,
             nonce: 0,
             pre_hash: self.last_hash(),
             merkle: String::new(),
             difficulty: self.difficulty,
         };
 
+        //2.奖励，实际上是一笔交易，有sender， receiver，amount
         let reward_trans = Transaction {
+            //把奖励发出者写死
             sender: String::from("Root"),
             receiver: self.miner_addr.clone(),
             amount: self.reward,
         };
 
+        //2.利用上面的数据填充区块
         let mut block = Block {
             header,
             count: 0,
             transactions: vec![],
         };
 
+        //push是装元素的
         block.transactions.push(reward_trans);
+        //append是连接两个vector的
+        //前者是区块中的交易，后者是整个链上所有交易
         block.transactions.append(&mut self.curr_trans);
+        //区块计数是区块中的交易数量
         block.count = block.transactions.len() as u32;
+        //把区块中的交易组织成默克尔树
         block.header.merkle = Chain::get_merkle(block.transactions.clone());
         Chain::proof_of_work(&mut block.header);
 
@@ -122,13 +140,16 @@ impl Chain {
     }
 
     fn get_merkle(curr_trans: Vec<Transaction>) -> String {
+        //1.新建vec
         let mut merkle = Vec::new();
 
+        //2.遍历交易，将其哈希装入vec
         for t in &curr_trans {
             let hash = Chain::hash(t);
             merkle.push(hash);
         }
 
+        //2.计算vec长度的奇偶性
         if merkle.len() % 2 == 1 {
             let last = merkle.last().cloned().unwrap(); //默克尔树都是双数哦
             merkle.push(last);
@@ -145,11 +166,14 @@ impl Chain {
         merkle.pop().unwrap() //返回根哈希
     }
 
+    //工作量证明
     pub fn proof_of_work(header: &mut BlockHeader) {
         loop {
             let hash = Chain::hash(header);
             let slice = &hash[..header.difficulty as usize]; //加密切片吗，可以的，因为参数是泛型
+                                                             //[0,1,2..]
 
+            //解析难度
             match slice.parse::<i32>() {
                 Ok(val) => {
                     if val != 0 {
@@ -159,7 +183,6 @@ impl Chain {
                         break;
                     }
                 }
-
                 Err(_) => {
                     header.nonce += 1;
                     continue;
@@ -175,16 +198,15 @@ impl Chain {
         let res = hasher.result();
         let vec_res = res.to_vec();
 
-        Chain::hex_to_string(vec_res.as_slice());
+        Chain::hex_to_string(vec_res.as_slice())
+    }
 
-        pub fn hex_to_string(vec_res: &[u8]) -> String {
-            let mut s = String::new();
+    pub fn hex_to_string(vec_res: &[u8]) -> String {
+        let mut s = String::new();
 
-            for b in vec_res {
-                write!(&mut s, "{:x}", b).expect("unable to write");
-            }
-
-            s
+        for b in vec_res {
+            write!(&mut s, "{:x}", b).expect("unable to write");
         }
+        s
     }
 }
