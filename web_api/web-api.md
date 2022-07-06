@@ -70,3 +70,5 @@ impl Post {
 use crate::models::Post;//引入同目录下的其他mod
 ```
 
+7.新建了三个宏来处理问题
+
