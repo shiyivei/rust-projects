@@ -1,0 +1,1 @@
+/Users/qinjianquan/rust-projects/wasm_game/target/wasm32-unknown-unknown/release/wasm_game.wasm: /Users/qinjianquan/rust-projects/wasm_game/src/lib.rs /Users/qinjianquan/rust-projects/wasm_game/www/utils/random.js
