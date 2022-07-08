@@ -1,0 +1,1 @@
+/Users/qinjianquan/rust-projects/read-rust-language-tutorials-second-time/target/debug/smart-pointer: /Users/qinjianquan/rust-projects/read-rust-language-tutorials-second-time/smart-pointer/src/main.rs

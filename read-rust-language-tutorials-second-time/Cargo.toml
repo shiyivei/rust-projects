@@ -1,0 +1,7 @@
+[workspace]
+members = [
+     "gussing_game",
+     "variables",
+     "minigrep",
+     "smart-pointer"
+     ]
